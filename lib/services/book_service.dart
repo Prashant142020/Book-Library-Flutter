@@ -6,15 +6,23 @@ class BookService {
   static const String baseUrl = 'https://gutendex.com/books/';
   String? nextUrl;
 
-  Future<Map<String, dynamic>> fetchBooks(int page) async {
+  Future<Map<String, dynamic>> fetchBooks(int page, {String? searchQuery}) async {
     try {
-      final url = page == 1 ? baseUrl : '$baseUrl?page=$page';
+      String url;
+      if (searchQuery != null && searchQuery.isNotEmpty) {
+        // Add search parameter to the URL
+        url = '$baseUrl?search=${Uri.encodeComponent(searchQuery)}';
+        if (page > 1) {
+          url += '&page=$page';
+        }
+      } else {
+        url = page == 1 ? baseUrl : '$baseUrl?page=$page';
+      }
+
       final response = await http.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-
-        // Store the next URL for pagination
         nextUrl = data['next'] as String?;
 
         if (data['results'] != null && data['results'].isNotEmpty) {

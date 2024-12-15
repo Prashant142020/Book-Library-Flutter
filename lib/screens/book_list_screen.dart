@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../models/book.dart';
 import '../services/book_service.dart';
 import 'book_detail_screen.dart';
+import 'dart:async';
 
 class BookListScreen extends StatefulWidget {
   const BookListScreen({super.key});
@@ -17,12 +18,30 @@ class _BookListScreenState extends State<BookListScreen> {
   bool isLoading = false;
   int page = 1;
   bool hasMore = true;
-  String query = '';
+  String searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+  Timer? _debounce;
 
   @override
-  void initState() {
-    super.initState();
-    _loadBooks();
+  void dispose() {
+    _debounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String query) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        setState(() {
+          searchQuery = query;
+          books.clear();
+          page = 1;
+          hasMore = true;
+        });
+        _loadBooks();
+      }
+    });
   }
 
   Future<void> _loadBooks() async {
@@ -33,7 +52,7 @@ class _BookListScreenState extends State<BookListScreen> {
     });
 
     try {
-      final result = await _bookService.fetchBooks(page);
+      final result = await _bookService.fetchBooks(page, searchQuery: searchQuery);
       final newBooks = result['books'] as List<Book>;
       final hasMorePages = result['hasMore'] as bool;
 
@@ -67,119 +86,128 @@ class _BookListScreenState extends State<BookListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredBooks = books
-        .where((book) => book.title.toLowerCase().contains(query.toLowerCase()))
-        .toList();
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Book Discovery'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () async {
-              String? result = await showSearch(
-                context: context,
-                delegate: BookSearchDelegate(books),
-              );
-              if (result != null) {
-                setState(() {
-                  query = result;
-                });
-              }
-            },
-          ),
-        ],
       ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          setState(() {
-            books.clear();
-            page = 1;
-            hasMore = true;
-          });
-          await _loadBooks();
-        },
-        child: NotificationListener<ScrollNotification>(
-          onNotification: (scrollInfo) {
-            if (!isLoading &&
-                hasMore &&
-                scrollInfo.metrics.pixels >=
-                    scrollInfo.metrics.maxScrollExtent - 200) {
-              _loadBooks();
-            }
-            return false;
-          },
-          child: filteredBooks.isEmpty
-              ? const Center(
-                  child: Text('No books found'),
-                )
-              : ListView.builder(
-                  itemCount: filteredBooks.length + (isLoading ? 1 : 0),
-                  itemBuilder: (context, index) {
-                    if (index == filteredBooks.length) {
-                      return const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(16.0),
-                          child: CircularProgressIndicator(),
-                        ),
-                      );
-                    }
-
-                    var book = filteredBooks[index];
-                    return Card(
-                      margin: const EdgeInsets.symmetric(
-                        horizontal: 8.0,
-                        vertical: 4.0,
-                      ),
-                      child: ListTile(
-                        leading: ClipRRect(
-                          borderRadius: BorderRadius.circular(4.0),
-                          child: CachedNetworkImage(
-                            imageUrl: book.coverUrl,
-                            width: 50,
-                            height: 80,
-                            fit: BoxFit.cover,
-                            placeholder: (context, url) => const SizedBox(
-                              width: 50,
-                              child: Center(
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search by title, author...',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _searchController.clear();
+                          _onSearchChanged('');
+                        },
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8.0),
+                ),
+              ),
+              onChanged: _onSearchChanged,
+            ),
+          ),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () async {
+                setState(() {
+                  books.clear();
+                  page = 1;
+                  hasMore = true;
+                });
+                await _loadBooks();
+              },
+              child: NotificationListener<ScrollNotification>(
+                onNotification: (scrollInfo) {
+                  if (!isLoading &&
+                      hasMore &&
+                      scrollInfo.metrics.pixels >=
+                          scrollInfo.metrics.maxScrollExtent - 200) {
+                    _loadBooks();
+                  }
+                  return false;
+                },
+                child: books.isEmpty && !isLoading
+                    ? const Center(
+                        child: Text('No books found'),
+                      )
+                    : ListView.builder(
+                        itemCount: books.length + (isLoading ? 1 : 0),
+                        itemBuilder: (context, index) {
+                          if (index == books.length) {
+                            return const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(16.0),
                                 child: CircularProgressIndicator(),
                               ),
+                            );
+                          }
+
+                          var book = books[index];
+                          return Card(
+                            margin: const EdgeInsets.symmetric(
+                              horizontal: 8.0,
+                              vertical: 4.0,
                             ),
-                            errorWidget: (context, url, error) =>
-                                const Icon(Icons.error),
-                          ),
-                        ),
-                        title: Text(
-                          book.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontFamily: 'NotoSans',
-                          ),
-                        ),
-                        subtitle: Text(
-                          book.author,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontFamily: 'NotoSans',
-                          ),
-                        ),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) =>
-                                  BookDetailScreen(book: book),
+                            child: ListTile(
+                              leading: ClipRRect(
+                                borderRadius: BorderRadius.circular(4.0),
+                                child: CachedNetworkImage(
+                                  imageUrl: book.coverUrl,
+                                  width: 50,
+                                  height: 80,
+                                  fit: BoxFit.cover,
+                                  placeholder: (context, url) => const SizedBox(
+                                    width: 50,
+                                    child: Center(
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  ),
+                                  errorWidget: (context, url, error) =>
+                                      const Icon(Icons.error),
+                                ),
+                              ),
+                              title: Text(
+                                book.title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontFamily: 'NotoSans',
+                                ),
+                              ),
+                              subtitle: Text(
+                                book.author,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontFamily: 'NotoSans',
+                                ),
+                              ),
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        BookDetailScreen(book: book),
+                                  ),
+                                );
+                              },
                             ),
                           );
                         },
                       ),
-                    );
-                  },
-                ),
-        ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
