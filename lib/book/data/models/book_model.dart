@@ -1,39 +1,29 @@
 import 'dart:convert';
+import '../../domain/entities/book.dart';
 
-class Book {
-  final int id;
-  final String title;
-  final String author;
-  final String coverUrl;
-  final List<String> downloadUrls;
-
-  Book({
-    required this.id,
-    required this.title,
-    required this.author,
-    required this.coverUrl,
-    required this.downloadUrls,
+class BookModel extends Book {
+  BookModel({
+    required super.id,
+    required super.title,
+    required super.author,
+    required super.coverUrl,
+    required super.downloadUrls,
   });
 
-  factory Book.fromJson(Map<String, dynamic> json) {
-    // Decode title with UTF-8
+  factory BookModel.fromJson(Map<String, dynamic> json) {
     String decodedTitle = utf8.decode(json['title'].toString().codeUnits);
     
-    // Get author names
     String authorName = 'Unknown';
     if (json['authors'] != null && json['authors'].isNotEmpty) {
       authorName = json['authors'][0]['name'] ?? 'Unknown';
-      // Decode author name with UTF-8
       authorName = utf8.decode(authorName.codeUnits);
     }
 
-    // Get cover URL
     String cover = 'https://via.placeholder.com/150';
     if (json['formats'] != null && json['formats']['image/jpeg'] != null) {
       cover = json['formats']['image/jpeg'];
     }
 
-    // Get download URLs
     List<String> downloads = [];
     if (json['formats'] != null) {
       if (json['formats']['application/epub+zip'] != null) {
@@ -47,7 +37,7 @@ class Book {
       }
     }
 
-    return Book(
+    return BookModel(
       id: json['id'],
       title: decodedTitle,
       author: authorName,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'screens/book_list_screen.dart';
+
+import 'book/presentation/screens/book_list_screen.dart';
 
 void main() {
   runApp(const Bookology());

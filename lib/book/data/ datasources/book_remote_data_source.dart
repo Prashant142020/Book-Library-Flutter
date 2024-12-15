@@ -1,16 +1,22 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../models/book.dart';
+import '../models/book_model.dart';
 
-class BookService {
+abstract class BookRemoteDataSource {
+  Future<Map<String, dynamic>> getBooks(int page, {String? searchQuery});
+}
+
+class BookRemoteDataSourceImpl implements BookRemoteDataSource {
+  final http.Client client;
   static const String baseUrl = 'https://gutendex.com/books/';
-  String? nextUrl;
 
-  Future<Map<String, dynamic>> fetchBooks(int page, {String? searchQuery}) async {
+  BookRemoteDataSourceImpl({required this.client});
+
+  @override
+  Future<Map<String, dynamic>> getBooks(int page, {String? searchQuery}) async {
     try {
       String url;
       if (searchQuery != null && searchQuery.isNotEmpty) {
-        // Add search parameter to the URL
         url = '$baseUrl?search=${Uri.encodeComponent(searchQuery)}';
         if (page > 1) {
           url += '&page=$page';
@@ -19,33 +25,23 @@ class BookService {
         url = page == 1 ? baseUrl : '$baseUrl?page=$page';
       }
 
-      final response = await http.get(Uri.parse(url));
+      final response = await client.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        nextUrl = data['next'] as String?;
+        final String? nextUrl = data['next'] as String?;
 
         if (data['results'] != null && data['results'].isNotEmpty) {
           return {
-            'books': List<Book>.from(
-                data['results'].map((bookJson) => Book.fromJson(bookJson))),
+            'books': List<BookModel>.from(
+                data['results'].map((bookJson) => BookModel.fromJson(bookJson))),
             'hasMore': nextUrl != null,
           };
-        } else {
-          return {
-            'books': <Book>[],
-            'hasMore': false,
-          };
         }
-      } else {
-        throw Exception('Failed to load books');
       }
+      throw Exception('Failed to load books');
     } catch (e) {
       throw Exception('Failed to load books: $e');
     }
-  }
-
-  bool hasNextPage() {
-    return nextUrl != null;
   }
 }

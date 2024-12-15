@@ -1,9 +1,14 @@
-import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import '../models/book.dart';
-import '../services/book_service.dart';
-import 'book_detail_screen.dart';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'dart:async';
+
+import '../../data/ datasources/book_remote_data_source.dart';
+import '../../data/ repositories/book_repository_impl.dart';
+import '../../domain/ usecases/get_books.dart';
+import '../../domain/entities/book.dart';
+import 'book_detail_screen.dart';
+ 
 
 class BookListScreen extends StatefulWidget {
   const BookListScreen({super.key});
@@ -13,7 +18,7 @@ class BookListScreen extends StatefulWidget {
 }
 
 class _BookListScreenState extends State<BookListScreen> {
-  final BookService _bookService = BookService();
+  late final GetBooks _getBooks;
   List<Book> books = [];
   bool isLoading = false;
   int page = 1;
@@ -21,6 +26,18 @@ class _BookListScreenState extends State<BookListScreen> {
   String searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounce;
+
+  @override
+  void initState() {
+    super.initState();
+    final bookRepository = BookRepositoryImpl(
+      remoteDataSource: BookRemoteDataSourceImpl(
+        client: http.Client(),
+      ),
+    );
+    _getBooks = GetBooks(bookRepository);
+    _loadBooks();
+  }
 
   @override
   void dispose() {
@@ -52,7 +69,7 @@ class _BookListScreenState extends State<BookListScreen> {
     });
 
     try {
-      final result = await _bookService.fetchBooks(page, searchQuery: searchQuery);
+      final result = await _getBooks.execute(page, searchQuery: searchQuery);
       final newBooks = result['books'] as List<Book>;
       final hasMorePages = result['hasMore'] as bool;
 
@@ -210,107 +227,5 @@ class _BookListScreenState extends State<BookListScreen> {
         ],
       ),
     );
-  }
-}
-
-class BookSearchDelegate extends SearchDelegate<String> {
-  final List<Book> books;
-
-  BookSearchDelegate(this.books);
-
-  @override
-  String get searchFieldLabel => 'Search by title or author';
-
-  @override
-  List<Widget> buildActions(BuildContext context) {
-    return [
-      IconButton(
-        icon: const Icon(Icons.clear),
-        onPressed: () {
-          query = '';
-        },
-      ),
-    ];
-  }
-
-  @override
-  Widget buildResults(BuildContext context) {
-    final results = books
-        .where(
-          (book) => book.title.toLowerCase().contains(query.toLowerCase()),
-        )
-        .toList();
-
-    return ListView.builder(
-      itemCount: results.length,
-      itemBuilder: (context, index) {
-        var book = results[index];
-        return ListTile(
-          title: Text(
-            book.title,
-            style: const TextStyle(
-              fontFamily: 'NotoSans',
-            ),
-          ),
-          subtitle: Text(
-            book.author,
-            style: const TextStyle(
-              fontFamily: 'NotoSans',
-            ),
-          ),
-          onTap: () {
-            close(context, book.title);
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => BookDetailScreen(book: book),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  @override
-  Widget buildSuggestions(BuildContext context) {
-    final suggestions = books
-        .where((book) => book.title.toLowerCase().contains(query.toLowerCase()))
-        .toList();
-
-    return ListView.builder(
-      itemCount: suggestions.length,
-      itemBuilder: (context, index) {
-        var book = suggestions[index];
-        return ListTile(
-          title: Text(
-            book.title,
-            style: const TextStyle(
-              fontFamily: 'NotoSans',
-            ),
-          ),
-          subtitle: Text(
-            "by ${book.author}",
-            style: const TextStyle(
-              fontFamily: 'NotoSans',
-            ),
-          ),
-          onTap: () {
-            close(context, book.title);
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => BookDetailScreen(book: book),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  @override
-  Widget? buildLeading(BuildContext context) {
-    throw UnimplementedError();
   }
 }
