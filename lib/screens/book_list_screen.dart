@@ -154,11 +154,17 @@ class _BookListScreenState extends State<BookListScreen> {
                           book.title,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontFamily: 'NotoSans',
+                          ),
                         ),
                         subtitle: Text(
                           book.author,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontFamily: 'NotoSans',
+                          ),
                         ),
                         onTap: () {
                           Navigator.push(
@@ -212,8 +218,18 @@ class BookSearchDelegate extends SearchDelegate<String> {
       itemBuilder: (context, index) {
         var book = results[index];
         return ListTile(
-          title: Text(book.title),
-          subtitle: Text(book.author),
+          title: Text(
+            book.title,
+            style: const TextStyle(
+              fontFamily: 'NotoSans',
+            ),
+          ),
+          subtitle: Text(
+            book.author,
+            style: const TextStyle(
+              fontFamily: 'NotoSans',
+            ),
+          ),
           onTap: () {
             close(context, book.title);
             Navigator.push(
@@ -239,8 +255,18 @@ class BookSearchDelegate extends SearchDelegate<String> {
       itemBuilder: (context, index) {
         var book = suggestions[index];
         return ListTile(
-          title: Text(book.title),
-          subtitle: Text("by${book.author}"),
+          title: Text(
+            book.title,
+            style: const TextStyle(
+              fontFamily: 'NotoSans',
+            ),
+          ),
+          subtitle: Text(
+            "by ${book.author}",
+            style: const TextStyle(
+              fontFamily: 'NotoSans',
+            ),
+          ),
           onTap: () {
             close(context, book.title);
             Navigator.push(
